@@ -1,0 +1,231 @@
+---
+title: "A2 224X_R Notebook"
+output: html_notebook
+---
+
+Creating subset of data
+```{r}
+recsV4 <- recs2015_public_v3[, c("DIVISION", "UATYP10","TOTALBTU" , "NHSLDMEM" , "MONEYPY" , "HDD65", "NUMFRIG" , "NUMBERAC" , "WASHLOAD", "LGTINLED", "AIRCOND", "HEATHOME", "CDD65")]
+
+```
+Q: List your chosen drivers with a brief description of why you selected each. You are asked to give them in order of your guess of most correlated (Driver 1) to least correlated (Driver 5) with TOTALBTU. Please commit to responses to this question before moving on; you may end up changing your chosen drivers, but the point of this question is to test your intuition.
+
+Driver 1:NUMBERAC (This is the number of AC units, I think it is important since HAVC systems account for the greatest percentage of energy consumption in buildings, followed by lighting and plugloads)
+Driver 2: WASHLOAD (This is the frequency for using the washing machine per week. I consider the washing machine to be one of the appliances in a home that uses the most of energy. Plus, it is within the plugloads category that I consider important)
+Driver 3:AIRCOND (This is whether a home has AC or not. I consider this to be an important driver of energy consumption given my explanation for driver 1, however I considered 1 to be more important given the level of granularity of the data. Drivers 3 & 4 only have 2 levels)
+Driver 4:HEATHOME (Same as Driver 3)
+Driver 5:LGTINLED (This is the percentage of the lights that are LED. Given the contribution of lighting to the total energy consumption in buildings )
+Driver 6: (additional driver) (Cooling Degree days at 65F. I just wanted to try it, given HDD65 is a key variable used to model energy consumption in buildings)
+
+All the measures above where chosen taking into consideration the feasibililty of retrofits in existing buildings as well as the possibility of implementing a new policy to regulate the variables that are found to contribute the most to energy consumption in our model
+
+Cleaning data
+
+```{r}
+# filtering
+recsV5 <- filter(recsV4,DIVISION == 10 & UATYP10 == "U" )
+
+# Deleting -2
+## See how can I delete from more than one column
+recsV6 <-recsV5[ grep("-2", recsV5$NUMBERAC, invert = TRUE),]
+recsV7 <-recsV6[ grep("-2", recsV6$WASHLOAD, invert = TRUE),]
+
+
+
+```
+
+Changing categoricals MONEYPY and LGTINLED to numerical variables (usd and percentages)
+
+For MONEYPY
+1 = 10000
+2 = 30000
+3 = 50000
+4 = 70000
+5 = 90000
+6 = 110000
+7 = 130000
+8 = 150000
+
+For LGTINLED
+
+1 = 100
+2 = 75
+3 = 50
+4 = 25
+0 = 0
+
+```{r}
+#foo <- mapvalues(foo, from=c("AA", "AC", "AG"), to=c("0101", "0102", "0103"))
+
+# vectorToUpdate is dataframe$vectorname) 
+# (dataframe$vectorname)<- mapvalues (dataframe$vectorname, from = c ("oldValue1", "oldValue2", etc), to = c ("newValue1", "newValue2", etc))
+
+#recsV7$LGTINLED <- mapvalues(recsV7$LGTINLED, from = c("1", "2", "3", "4", "0"), to = c("100", "75", "50", "25", "0" ))
+
+#recsV7$MONEYPY <- mapvalues(recsV7$MONEYPY, from = c("1", "2", "3", "4", "5", "6", "7", "8"), to = c("10000", "30000", "50000", "70000", "90000", "110000", "130000", "150000" ))
+
+recsV7$MONEYPY <- replace(recsV7$MONEYPY, recsV7$MONEYPY == 1, 10000)
+recsV7$MONEYPY <- replace(recsV7$MONEYPY, recsV7$MONEYPY == 2, 30000)
+recsV7$MONEYPY <- replace(recsV7$MONEYPY, recsV7$MONEYPY == 3, 50000)
+recsV7$MONEYPY <- replace(recsV7$MONEYPY, recsV7$MONEYPY == 4, 70000)
+recsV7$MONEYPY <- replace(recsV7$MONEYPY, recsV7$MONEYPY == 5, 90000)
+recsV7$MONEYPY <- replace(recsV7$MONEYPY, recsV7$MONEYPY == 6, 110000)
+recsV7$MONEYPY <- replace(recsV7$MONEYPY, recsV7$MONEYPY == 7, 130000)
+recsV7$MONEYPY <- replace(recsV7$MONEYPY, recsV7$MONEYPY == 8, 150000)
+
+recsV7$LGTINLED <- replace(recsV7$LGTINLED, recsV7$LGTINLED == 1, 100)
+recsV7$LGTINLED <- replace(recsV7$LGTINLED, recsV7$LGTINLED == 2, 75)
+recsV7$LGTINLED <- replace(recsV7$LGTINLED, recsV7$LGTINLED == 3, 50)
+recsV7$LGTINLED <- replace(recsV7$LGTINLED, recsV7$LGTINLED == 4, 25)
+
+
+```
+
+
+
+Correlation matrix
+
+```{r}
+forCorrMatRecs <- recsV7[,c(3:13)]
+corrMatrRecs = cor(forCorrMatRecs)
+round (corrMatrRecs,2)
+```
+
+Q: Interpret the results of your correlation analysis. Identify and discuss the 2-3 strongest and weakest correlated pairs that include the outcome-of-interest, TOTALBTU, specifically any surprises.
+
+Strong 1: TOTALBTU & HEATHOME (0.41) (this potentially means that the most amount of energy comes from heating)
+Strong 2: TOTALBTU & NHSLDMEM (0.38) (it makes sense that the more people in a home, the higher the energy consumption)
+Strong 3: TOTALBTU & WASHLOAD (0.34) (this seems somehow correlated with the number of people in the house, meaning the use of washing machine is more frequent)
+
+Weak 1: TOTALBTU & CDD65 (-0.24) (Negative correlation, which not that intuitive, statistically it means that as cooling increases, total btus decreases)
+Weak 2:TOTALBTU & NUMBERAC (0.07)( This is close to 0, which means no correlation, which means that number of AC units has almost no effect on totalBTUs
+Weak 3: TOTALBTU & LGTINLED (0.11) (this means that LEDs are not as impactful to energy consumption )
+
+Then identify and discuss the 2-3 strongest correlated pairs that don't include the outcome-of-interest (like MONEYPY vs. HDD65), and how these correlations may affect our regression analysis.
+
+Strong 1: CDD65 & HDD65 (-0.67) (a strong negative correlation which makes sense given that the more the heating days the less the cooling ones)
+Strong 2:WASHLOAD & NHSLDMEM (0.44) (This is as expected, the more people that live in a house, the more the washing machine gets used during the week)
+Strong 3:HEATHOME & HDD65 (0.42) (this means that the more heating days on a day, the more people will be likely to have a heating system installed at their home)
+
+Plot the strongest pair
+
+```{r}
+plot (recsV7$HEATHOME, recsV7$TOTALBTU, main = "TotalBTUs vs HeatHome", xlab= "HeatHome", ylab = "BTUs")
+abline(lm(TOTALBTU ~ HEATHOME), col=2)
+
+
+```
+
+Single Variable Linear Fit for HeatHome 
+
+```{r}
+lm.fitHeat = lm(TOTALBTU ~ HEATHOME, data=recsV7)
+lm.fitHeat
+summary (lm.fitHeat)
+#plot (lm.fitHeat)
+```
+Outliers analysis
+
+```{r}
+# Outlier analysis
+# Separating data in two clusters based on whether they have heating systems or not
+highbtu <- filter(recsV7, HEATHOME == 1)
+min(highbtu$TOTALBTU)
+max(highbtu$TOTALBTU)
+summary(highbtu)
+boxplot(highbtu$TOTALBTU, main = "TotalBTUs (HeatHome = 1)", ylab = "BTUs")
+
+minbtu <- filter (recsV7, HEATHOME == 0)
+min (minbtu$TOTALBTU)
+max(minbtu$TOTALBTU)
+summary(minbtu)
+
+#Outliers (Q3 + 1.5 (Q3-Q1))
+highUp <- 75358 + 1.5 * (76358-43411)
+outliers <- filter(highbtu, TOTALBTU > highUp)
+outliers
+
+highMon <- 110000 + 1.5*(110000-30000)
+highMon
+
+boxplot(highbtu$MONEYPY, main = "MONEYPY (HeatHome = 1)", ylab = "BTUs")
+plot(recsV7$MONEYPY, recsV7$TOTALBTU)
+
+#Fitting a liner model to understand the drivers of the outliers
+lm.fitHigh = lm(TOTALBTU ~ NHSLDMEM + MONEYPY + HDD65 + NUMFRIG + NUMBERAC + WASHLOAD + LGTINLED + HEATHOME + AIRCOND + CDD65, data=highbtu)
+lm.fitHigh
+summary (lm.fitHigh)
+```
+
+Q: Discuss the results of your scatter plot and the goodness of fit of the trendline. Note if there are any outliers of interest.
+
+
+The plot tells us that for the homes that do not have a heating system, the energy consumption ranges from 7,381.82 BTUs to 40,401.88 BTU , while for those with heating installed the energy consumption goes from 19,006.8 BTUS to 153,823.2 BTUS. 
+
+The trendline has an equation of TotalBTUs = 23,940 + 40,275 * HEATHOME, this only applies for the mean of both categories. if HEATHOME is 0, the equation gives us the mean of BTUS the cluster of HEATHOME = 0 ("minbtu") whereas if HEATHOME is 1, we get the mean of "highbtu", which is the cluster of HEATHOME = 1.
+
+As for outliers, we do a boxplot and can see that there are 5 outliers. We calculate get the outliers by filtering the values in the upper cluster that are greater than 2.689 standard deviations (Q3 + 1.5IQR). We fit a linear model for the dataframe of the outliers. We can see that based on the Pr (>|t|)the main drivers are NHSLDMEM, HDD65, MONEYPY and NUMFRIG. For instance, a quick look at the quartiles of MONEYPY, tells us that the values for the outliers are in the 4th quartile which means high level of income. 
+
+
+Fitting Multivariable Linear Regression
+
+```{r}
+# Multivariable Linear Regression
+lm.fitRecs = lm(TOTALBTU ~ NHSLDMEM + MONEYPY + HDD65 + NUMFRIG + NUMBERAC + WASHLOAD + LGTINLED + HEATHOME + AIRCOND + CDD65, data=recsV7)
+lm.fitRecs
+summary (lm.fitRecs)
+```
+
+Forward Stepwise Selection
+
+
+```{r}
+library(leaps)
+regfit.fwdRec = regsubsets(TOTALBTU ~ NHSLDMEM + MONEYPY + HDD65 + NUMFRIG + NUMBERAC + WASHLOAD + LGTINLED + HEATHOME + AIRCOND + CDD65, data=recsV7,nvmax =10,method = c("forward"))
+summary (regfit.fwdRec )
+coef(regfit.fwdRec,9)
+#plot(lm.fitRecs)
+```
+
+Q: Discuss the difference between your single-predictor and multiple-predictor regression models. In particular, describe how the coefficient of your first predictor (from the single-predictor model) changed once you “controlled” for other variables. Finally, discuss any other results you thought were insightful.
+
+Definetelly, a single predictor misses all the correlations between multiple variables. We can see how the single predictor model gave a high weight to HEATHOME (Pr (>|t|) = 1.11e-05) while for the multivariable predictor HEATHOME was in 5th place in terms of significance to the model (Pr (>|t|) = 0.06265), more significant parameters were NHSLDMEM, followed by HDD65, NUMFRIG and MONEYPY. In addition to that, we can see that the R2 of the single variable model (0.1608) is less than that of the multivariable model (0.3326), which tells us that the latter is a more complete model for our study.
+
+Insightfull enought is that after cleaning the data (removing the "-2") my datapoints were reduced from 882 observations to 107, which tells the importance of gathering complete data. In addition to that, I somehow thought that number of AC units would have a greater impact on energy consumption that anything related to heating, which I can say I am biased since where I live in an area where we dont need much heating but more AC. For this same reason, I didnt choose many parameters related to heating, and now I can see how my biases can affect my input data which could hinder the selection of better parameters to fit a more accurate model. 
+
+Single Variable LR
+lm(formula = TOTALBTU ~ HEATHOME, data = recsV7)
+
+Coefficients:
+            Estimate Std. Error t value Pr(>|t|)    
+(Intercept)    23940       8222   2.912  0.00439 ** 
+HEATHOME       40275       8726   4.616 1.11e-05 ***
+
+Multiple R-squared:  0.1687,	Adjusted R-squared:  0.1608 
+
+
+Multivariable LR
+lm(formula = TOTALBTU ~ NHSLDMEM + MONEYPY + HDD65 + NUMFRIG + 
+    NUMBERAC + WASHLOAD + LGTINLED + HEATHOME + AIRCOND + CDD65, 
+    data = recsV7)
+
+Coefficients: (1 not defined because of singularities)
+              Estimate Std. Error t value Pr(>|t|)   
+(Intercept) -1.446e+04  1.520e+04  -0.951  0.34385   
+NHSLDMEM     5.236e+03  1.708e+03   3.065  0.00282 **
+MONEYPY      1.226e-01  6.132e-02   1.999  0.04844 * 
+HDD65        5.650e+00  2.405e+00   2.350  0.02081 * 
+NUMFRIG      8.321e+03  3.856e+03   2.158  0.03341 * 
+NUMBERAC    -3.324e+03  3.699e+03  -0.899  0.37105   
+WASHLOAD     1.180e+03  1.098e+03   1.075  0.28496   
+LGTINLED     3.168e+02  1.757e+02   1.803  0.07442 . 
+HEATHOME     1.949e+04  1.045e+04   1.865  0.06525 . 
+AIRCOND             NA         NA      NA       NA   
+CDD65        1.814e+00  3.668e+00   0.495  0.62201 
+
+Multiple R-squared:  0.3893,	Adjusted R-squared:  0.3326 
+
+
+
+
+
